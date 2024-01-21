@@ -27,4 +27,18 @@ static async Task Main()
     var cloneUrls = uniqueRepos.Select(r => r.CloneUrl);
 }
 
-await Main();
+static void DriveStuff()
+{
+    IEnumerable<DriveInfo> volumes = Volumes.GetVolumes();
+    DriveInfo? selection = Volumes.SelectFromList(volumes);
+    if (selection == null)
+    {
+        Console.WriteLine("No selection found");
+        return;
+    }
+
+    var backupDir = Volumes.CreateBackupDirectory(selection);
+}
+
+DriveStuff();
+//await Main();
