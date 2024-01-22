@@ -1,9 +1,24 @@
-﻿using System.Collections;
+﻿using Octokit;
+using System.Collections;
 
 namespace RepoBackupUtil.Lib
 {
     public static class Volumes
     {
+        public static DirectoryInfo? SetUpBackupFile()
+        {
+            IEnumerable<DriveInfo> volumes = GetVolumes();
+            DriveInfo? selection = SelectFromList(volumes);
+            if (selection == null)
+            {
+                Console.WriteLine("No selection found");
+                return null;
+            }
+
+            var backupDir = CreateBackupDirectory(selection);
+            return backupDir;
+        }
+
         public static IEnumerable<DriveInfo> GetVolumes()
         {
             try
@@ -95,7 +110,6 @@ namespace RepoBackupUtil.Lib
 
             try
             {
-
                 if (isSystemDrive)
                 {
                     Console.WriteLine("Using system drive. Directing you to user folder...");
@@ -124,6 +138,26 @@ namespace RepoBackupUtil.Lib
                 Console.WriteLine(e.Message);
                 return null;
             }
+        }
+
+        public static HashSet<Repository> PopulateBackupDirectories(HashSet<Repository> repos, DirectoryInfo backupDir)
+        {
+            HashSet<Repository> newProjects = [];
+
+            foreach (Repository repo in repos)
+            {
+                bool exists = Directory.Exists($"{backupDir.FullName}/{repo.Name}");
+                bool hasContents = exists && Directory.EnumerateFileSystemEntries(
+                    $"{backupDir.FullName}/{repo.Name}").Any();
+
+                if (exists && hasContents) continue;
+
+                DirectoryInfo? repoDir = backupDir.CreateSubdirectory(repo.Name);
+                Console.WriteLine($"Created directory for project {repoDir.FullName}");
+                newProjects.Add(repo);
+            }
+
+            return newProjects;
         }
     }
 }

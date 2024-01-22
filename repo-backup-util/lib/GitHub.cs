@@ -1,10 +1,11 @@
 ﻿using Octokit;
+using System.Diagnostics;
 
 namespace RepoBackupUtil.Lib
 {
-    public static class GitHub
+    public class GitHub
     {
-        public static string SetCredentialsToken(GitHubClient github)
+        public static string GetCredentialsToken(GitHubClient github)
         {
             Console.WriteLine("Please enter your Github Personal Access Token: ");
             string? token = Console.ReadLine();
@@ -12,7 +13,7 @@ namespace RepoBackupUtil.Lib
             if (token == null)
             {
                 Console.WriteLine("Received invalid input. Try again:");
-                return SetCredentialsToken(github);
+                return GetCredentialsToken(github);
             }
             else
             {
@@ -20,7 +21,7 @@ namespace RepoBackupUtil.Lib
                 Credentials auth = new(token, authType);
                 github.Credentials = auth;
                 Console.WriteLine("Successfully authenticated with GitHub.");
-                return github.User.Current().Result.Login;
+                return token;
             }
         }
 
@@ -46,27 +47,13 @@ namespace RepoBackupUtil.Lib
         public static async Task<User> GetUser(string username, GitHubClient github)
         {
             Console.WriteLine("Checking for user...");
-            User? user = await github.User.Get(username);
+            User user = await github.User.Get(username) ?? throw new Exception("User does not exist");
 
-            if (user == null)
-            {
-                Console.WriteLine("User does not exist");
-                string newUsername = SetCredentialsToken(github);
-                return await GetUser(newUsername, github);
-            }
-            else
-            {
-                Console.WriteLine($"Found user {user.Login}. Loading repos...");
-                return user;
-            }
+            Console.WriteLine($"Found user {user.Login}. Loading repos...");
+            return user;
         }
 
-        public static async Task<IReadOnlyList<Repository>?> GetRepos(GitHubClient github)
-        {
-            Console.WriteLine("Loading repos...");
-            var repos = await github.Repository.GetAllForCurrent();
-            return repos;
-        }
+        public static async Task<IReadOnlyList<Repository>?> GetRepos(GitHubClient github) => await github.Repository.GetAllForCurrent();
 
         public static HashSet<Repository> GetUniqueRepos(IEnumerable<Repository> repos)
         {
@@ -80,6 +67,74 @@ namespace RepoBackupUtil.Lib
             }
 
             return uniqueRepos;
+        }
+
+        public static IEnumerable<Repository> GetProjectsToUpdate(HashSet<Repository> allRepos, DirectoryInfo backupDir)
+        {
+            HashSet<Repository> projectsToUpdate = [];
+            foreach (DirectoryInfo dir in backupDir.EnumerateDirectories())
+            {
+                bool isRepo = dir.GetDirectories(".git").Any();
+                if (!isRepo) continue;
+                Repository? repo = allRepos.FirstOrDefault(r => r.Name == dir.Name);
+                if (repo != null) projectsToUpdate.Add(repo);
+            }
+
+            return projectsToUpdate;
+        }
+
+        public record CloneProjectOptions : ICloneProject
+        {
+            public User User { get; init; } = default!;
+            public Repository Repo { get; init; } = default!;
+            public DirectoryInfo BackupDir { get; init; } = default!;
+            public string Token { get; init; } = default!;
+        }
+
+        public static void CloneProject(ICloneProject options)
+        {
+            string cloneString = "";
+            cloneString += $"clone https://{options.Token}@github.com/";
+            cloneString += $"{options.User.Login}/{options.Repo.Name} .";
+
+            Console.WriteLine($"Cloning {options.Repo.Name}...");
+
+            using (Process process = new())
+            {
+                process.StartInfo = new()
+                {
+                    FileName = "git",
+                    Arguments = cloneString,
+                    WorkingDirectory = $"{options.BackupDir}/{options.Repo.Name}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                process.Start();
+                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                process.WaitForExit();
+            };
+        }
+
+        public static void UpdateExistingRepo(Repository repo, DirectoryInfo backupDir)
+        {
+            Console.WriteLine($"Preparing update task for {repo.Name}...");
+
+            using (Process process = new())
+            {
+                process.StartInfo = new()
+                {
+                    FileName = "git",
+                    Arguments = "pull",
+                    WorkingDirectory = $"{backupDir}/{repo.Name}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                process.Start();
+                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                process.WaitForExit();
+            };
         }
     }
 }
