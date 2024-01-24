@@ -1,163 +1,116 @@
 ﻿using Octokit;
 using System.Collections;
 
-namespace RepoBackupUtil.Lib
+namespace GitAnchor.Lib;
+public static class Volumes
 {
-    public static class Volumes
+    public static DriveInfo[] GetVolumes()
     {
-        public static DirectoryInfo? SetUpBackupFile()
+        try
         {
-            IEnumerable<DriveInfo> volumes = GetVolumes();
-            DriveInfo? selection = SelectFromList(volumes);
-            if (selection == null)
-            {
-                Console.WriteLine("No selection found");
-                return null;
-            }
-
-            var backupDir = CreateBackupDirectory(selection);
-            return backupDir;
+            return DriveInfo.GetDrives();
         }
-
-        public static IEnumerable<DriveInfo> GetVolumes()
+        catch (UnauthorizedAccessException e)
         {
-            try
-            {
-                return DriveInfo.GetDrives();
-            } 
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return [];
-            }
+            Console.WriteLine("Unauthorized access to volumes. Please run as administrator.");
+            Console.WriteLine(e.Message);
+            return [];
         }
-
-        private static int ReadInput()
+        catch (Exception e)
         {
-            string? input = Console.ReadLine();
+            Console.WriteLine(e.Message);
+            return [];
+        }
+    }
 
-            while (input == null)
-            {
-                Console.WriteLine("Please enter a number: ");
-                input = Console.ReadLine();
-            }
+    private static DriveInfo? GetSelectedDrive(Hashtable options)
+    {
+        int inputAsInt = CommandLineTools.ReadAsInt();
 
-            try
+        if (!options.ContainsKey(inputAsInt)) return null;
+
+        foreach (DictionaryEntry entry in options)
+        {
+            if (entry.Key.Equals(inputAsInt))
             {
-                return int.Parse(input);
-            }
-            catch
-            {
-                Console.WriteLine("Invaid input. Please enter a number: ");
-                return ReadInput();
+                return entry.Value != null ? (DriveInfo)entry.Value : null;
             }
         }
 
-        private static DriveInfo? GetSelection(Hashtable options)
+        return null;
+    }
+
+    public static DriveInfo? SelectFromList(IEnumerable<DriveInfo> volumes)
+    {
+        int i = 0;
+        Hashtable options = [];
+
+        // prepare table and present options to user
+        Console.WriteLine("Select the drive you want to backup to (enter a number): \n");
+        foreach (DriveInfo volume in volumes)
         {
-            int inputAsInt = ReadInput();
+            ++i;
+            string option = $"{i}: {volume.Name} ({GetSizeInGB(volume)}GB available)";
+            Console.WriteLine(option);
+            options.Add(i, volume);
+        }
 
-            if (!options.ContainsKey(inputAsInt))
-            {
-                return null;
-            }
-
-            foreach (DictionaryEntry entry in options)
-            {
-                if (entry.Key.Equals(inputAsInt))
-                {
-                    Console.WriteLine($"value: {entry.Value}");
-                    Console.WriteLine($"type: {entry.Value?.GetType()}");
-                    return entry.Value != null ? (DriveInfo)entry.Value : null;
-                }
-            }
-
+        try
+        {
+            // parse user input and return appropiate drive info
+            return GetSelectedDrive(options);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
             return null;
         }
+    }
 
-        public static DriveInfo? SelectFromList(IEnumerable<DriveInfo> volumes)
+    public static DirectoryInfo? CreateAnchor(DirectoryInfo backupDir, string anchorName)
+    {
+        return backupDir.CreateSubdirectory(anchorName);
+    }
+
+    public static string? FindMainBackupFile()
+    {
+        // find a folder entitled `.ghbackups`
+        // check the system drive first, then scan for additional drives and check the root of each
+
+        var userFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        bool backupExistsInUserFolder = Directory.Exists($"{userFolder}/.ghbackups");
+
+        if (backupExistsInUserFolder) return $"{userFolder}/.ghbackups";
+
+        DriveInfo[] volumes = GetVolumes();
+        foreach (DriveInfo volume in volumes)
         {
-            int i = 0;
-            Hashtable options = [];
-
-            // prepare table and present options to user
-            Console.WriteLine("Select the drive you want to backup to (enter a number): \n");
-            foreach (DriveInfo volume in volumes)
-            {
-                ++i;
-                string option = $"{i}: {volume.Name} ({GetSizeInGB(volume)}GB available)";
-                Console.WriteLine(option);
-                options.Add(i, volume);
-            }
-
-            try
-            {
-                // parse user input and return appropiate drive info
-                return GetSelection(options);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return null;
-            }
+            bool backupExistsInRoot = Directory.Exists($"{volume.RootDirectory.FullName}/.ghbackups");
+            if (backupExistsInRoot) return $"{volume.RootDirectory.FullName}/.ghbackups";
         }
 
-        public static double GetSizeInGB(DriveInfo volume) => volume.TotalSize / 1024 / 1024 / 1024;
+        return null;
+    }
 
-        public static DirectoryInfo? CreateBackupDirectory(DriveInfo volume)
+    public static double GetSizeInGB(DriveInfo volume) => volume.TotalSize / 1024 / 1024 / 1024;
+
+    public static HashSet<Repository> PopulateBackupDirectories(HashSet<Repository> repos, DirectoryInfo backupDir)
+    {
+        HashSet<Repository> newProjects = [];
+
+        foreach (Repository repo in repos)
         {
-            bool isSystemDrive = volume.DriveType == DriveType.Fixed;
+            bool exists = Directory.Exists($"{backupDir.FullName}/{repo.Name}");
+            bool hasContents = exists && Directory.EnumerateFileSystemEntries(
+                $"{backupDir.FullName}/{repo.Name}").Any();
 
-            try
-            {
-                if (isSystemDrive)
-                {
-                    Console.WriteLine("Using system drive. Directing you to user folder...");
+            if (exists && hasContents) continue;
 
-                    string? userPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                    DirectoryInfo userDir = new(userPath);
-
-                    Console.WriteLine($"Checking for folder `.ghbackups` at `{userDir.FullName}`...");
-                    DirectoryInfo? backupDir = userDir.CreateSubdirectory(".ghbackups");
-
-                    return backupDir;
-                }
-                else
-                {
-                    Console.WriteLine($"Using {volume.Name}. Directing you to root folder...");
-
-                    DirectoryInfo? rootDir = volume.RootDirectory;
-                    Console.WriteLine($"Checking for folder `.ghbackups` at `{rootDir.FullName}`...");
-                    DirectoryInfo? backupDir = rootDir.CreateSubdirectory(".ghbackups");
-
-                    return backupDir;
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return null;
-            }
+            DirectoryInfo? repoDir = backupDir.CreateSubdirectory(repo.Name);
+            Console.WriteLine($"Created directory for project {repoDir.FullName}");
+            newProjects.Add(repo);
         }
 
-        public static HashSet<Repository> PopulateBackupDirectories(HashSet<Repository> repos, DirectoryInfo backupDir)
-        {
-            HashSet<Repository> newProjects = [];
-
-            foreach (Repository repo in repos)
-            {
-                bool exists = Directory.Exists($"{backupDir.FullName}/{repo.Name}");
-                bool hasContents = exists && Directory.EnumerateFileSystemEntries(
-                    $"{backupDir.FullName}/{repo.Name}").Any();
-
-                if (exists && hasContents) continue;
-
-                DirectoryInfo? repoDir = backupDir.CreateSubdirectory(repo.Name);
-                Console.WriteLine($"Created directory for project {repoDir.FullName}");
-                newProjects.Add(repo);
-            }
-
-            return newProjects;
-        }
+        return newProjects;
     }
 }

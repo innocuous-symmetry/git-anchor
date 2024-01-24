@@ -1,30 +1,27 @@
 ﻿using Octokit;
 using System.Diagnostics;
 
-namespace RepoBackupUtil.Lib
+namespace GitAnchor.Lib
 {
     public class GitHub
     {
-        public static string GetCredentialsToken(GitHubClient github)
+        public static GitHubClient CreateClient()
         {
-            Console.WriteLine("Please enter your Github Personal Access Token: ");
-            string? token = Console.ReadLine();
-
-            if (token == null)
-            {
-                Console.WriteLine("Received invalid input. Try again:");
-                return GetCredentialsToken(github);
-            }
-            else
-            {
-                AuthenticationType authType = AuthenticationType.Bearer;
-                Credentials auth = new(token, authType);
-                github.Credentials = auth;
-                Console.WriteLine("Successfully authenticated with GitHub.");
-                return token;
-            }
+            ProductHeaderValue productHeaderValue = new("git-anchor");
+            return new(productHeaderValue);
         }
 
+        public static string Authenticate(GitHubClient github, string? initialToken = null)
+        {
+            string token = initialToken ?? CommandLineTools.ReadAccessToken(github);
+            AuthenticationType authType = AuthenticationType.Bearer;
+            Credentials auth = new(token, authType);
+            github.Credentials = auth;
+            Console.WriteLine("Successfully authenticated with GitHub.");
+            return token;
+        }
+
+        /** @deprecated */
         public static string SetOAuthCredentials(GitHubClient github)
         {
             Console.WriteLine("Provide OAuth Client Secret: ");
@@ -83,15 +80,17 @@ namespace RepoBackupUtil.Lib
             return projectsToUpdate;
         }
 
-        public record CloneProjectOptions : ICloneProject
+        public record CloneProjectOptions
         {
             public User User { get; init; } = default!;
             public Repository Repo { get; init; } = default!;
             public DirectoryInfo BackupDir { get; init; } = default!;
             public string Token { get; init; } = default!;
+            public string? AnchorPath { get; init; }
+            public bool Verbose { get; init; } = false;
         }
 
-        public static void CloneProject(ICloneProject options)
+        public static void CloneProject(CloneProjectOptions options)
         {
             string cloneString = "";
             cloneString += $"clone https://{options.Token}@github.com/";
@@ -111,14 +110,15 @@ namespace RepoBackupUtil.Lib
                 };
 
                 process.Start();
-                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                if (options.Verbose) Console.WriteLine(process.StandardOutput.ReadToEnd());
                 process.WaitForExit();
+                Console.WriteLine($"Clone complete for {options.Repo.Name}");
             };
         }
 
-        public static void UpdateExistingRepo(Repository repo, DirectoryInfo backupDir)
+        public static void PullExistingRepo(Repository repo, DirectoryInfo backupDir, bool verbose = false)
         {
-            Console.WriteLine($"Preparing update task for {repo.Name}...");
+            Console.WriteLine($"Pulling {repo.Name}...");
 
             using (Process process = new())
             {
@@ -132,8 +132,9 @@ namespace RepoBackupUtil.Lib
                 };
 
                 process.Start();
-                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                if (verbose) Console.WriteLine(process.StandardOutput.ReadToEnd());
                 process.WaitForExit();
+                Console.WriteLine($"Pull complete for {repo.Name}");
             };
         }
     }
