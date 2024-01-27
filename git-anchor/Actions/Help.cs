@@ -22,6 +22,10 @@ public class Help : BaseAction
         Console.WriteLine("    --verbose        Prints verbose output.\n");
         Console.WriteLine("Example: git-anchor pull -v --name=cool-new-backup");
 
+        Console.WriteLine("git-anchor list");
+        Console.WriteLine("    Lists all existing backups.\n");
+        Console.WriteLine("Example: git-anchor list");
+
         Console.WriteLine("git-anchor find [--regex, -e] [--name, -n <name>]");
         Console.WriteLine("    Finds an existing backup matching the provided pattern.");
         Console.WriteLine("    --regex, -e      Find your backup directory based on a Regex search.");
