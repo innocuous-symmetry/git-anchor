@@ -21,6 +21,17 @@ public static class FileSystemTools {
         get => Volumes.FindMainBackupFile();
     }
 
+    public static long GetBackupSize(DirectoryInfo dir)
+    {
+        long size = 0;
+        foreach (FileInfo fi in dir.GetFiles("*", SearchOption.AllDirectories))
+        {
+            size += fi.Length;
+        }
+
+        return size;
+    }
+
     public static DirectoryInfo? SetUpMainBackupFile()
     {
         IEnumerable<DriveInfo> volumes = Volumes.GetVolumes();
@@ -44,6 +55,24 @@ public static class FileSystemTools {
             return CreateMainUnixDirectory(selection);
         else
             throw new Exception("Unsupported operating system");
+    }
+
+    public static DirectoryInfo? SetUpAnchor(DirectoryInfo backupDir, string? initialInput)
+    {
+        string defaultName = FileSystemTools.DefaultAnchorPath;
+        string? backupName = initialInput;
+
+        if (backupName == null)
+        {
+            Console.WriteLine($"Enter a name for this backup: (default {defaultName})");
+            backupName = Console.ReadLine();
+            if (backupName == "") backupName = defaultName;
+        }
+
+        if (backupName == null || backupName == "") throw new Exception("No backup name provided");
+
+        // create backup file
+        return Volumes.CreateAnchor(backupDir, backupName);
     }
 
     private static DirectoryInfo? CreateMainWindowsDirectory(DriveInfo volume, string? location = ".git-anchor")

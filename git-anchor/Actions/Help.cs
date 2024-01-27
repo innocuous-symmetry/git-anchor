@@ -4,7 +4,7 @@ namespace GitAnchor.Actions;
 
 public class Help : BaseAction
 {
-    public static async new Task<ActivityStatusCode> Run()
+    public static new ActivityStatusCode Run()
     {
         Console.WriteLine("\nGitAnchor - a tool for performing scoped backups of GitHub repositories based on credentials and configuration.");
         Console.WriteLine("Usage:\n");

@@ -5,11 +5,11 @@ using System.Diagnostics;
 namespace GitAnchor.Actions;
 public class Create : BaseAction
 {
-    public new static async Task<ActivityStatusCode> Run()
+    public new static async Task<ActivityStatusCode> RunAsync()
     {
         string[] args = Environment.GetCommandLineArgs();
 
-        string? backupName = args.FirstOrDefault(arg => arg.StartsWith("--name"));
+        string? backupName = args.FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"));
         string? token = args.FirstOrDefault(arg => arg.StartsWith("--token"));
         bool verbose = args.Any(arg => arg.StartsWith("--verbose")
             || arg.StartsWith("-v"));
@@ -18,7 +18,7 @@ public class Create : BaseAction
         DirectoryInfo backupDir = FileSystemTools.SetUpMainBackupFile() ?? throw new Exception("Encountered a problem creating main backup directory");
 
         // create backup file
-        DirectoryInfo? anchorDir = SetUpAnchor(backupDir, backupName);
+        DirectoryInfo? anchorDir = FileSystemTools.SetUpAnchor(backupDir, backupName);
 
         if (anchorDir == null)
         {
@@ -68,40 +68,20 @@ public class Create : BaseAction
         Console.WriteLine($"Preparing to clone {taskPool.Count} repositories. Starting...");
 
         // start a timer to track progress
-        Stopwatch stopwatch = new();
-        stopwatch.Start();
+        ProgressReporter reporter = new();
+        reporter.Start();
 
-        // execute all tasks
         Parallel.ForEach(taskPool, task => task.Start());
         Task.WaitAll([.. taskPool]);
 
-        stopwatch.Stop();
-        long elapsed = stopwatch.ElapsedMilliseconds < 1000
-            ? stopwatch.ElapsedMilliseconds
-            : stopwatch.ElapsedMilliseconds / 1000;
+        reporter.Stop();
 
-        string unit = stopwatch.ElapsedMilliseconds < 1000 ? "ms" : "s";
-
-        Console.WriteLine($"All tasks completed in {elapsed}{unit}. Exiting...");
-
-        return ActivityStatusCode.Ok;
-    }
-
-    private static DirectoryInfo? SetUpAnchor(DirectoryInfo backupDir, string? initialInput)
-    {
-        string defaultName = FileSystemTools.DefaultAnchorPath;
-        string? backupName = initialInput;
-
-        if (backupName == null)
+        if (verbose)
         {
-            Console.WriteLine($"Enter a name for this backup: (default {defaultName})");
-            backupName = Console.ReadLine();
-            if (backupName == "") backupName = defaultName;
+            var report = reporter.ToString();
+            Console.WriteLine(report);
         }
 
-        if (backupName == null || backupName == "") throw new Exception("No backup name provided");
-
-        // create backup file
-        return Volumes.CreateAnchor(backupDir, backupName);
+        return ActivityStatusCode.Ok;
     }
 }

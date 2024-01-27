@@ -72,6 +72,11 @@ public static class Volumes
         return backupDir.CreateSubdirectory(anchorName);
     }
 
+    public static DirectoryInfo? GetAnchor(DirectoryInfo backupDir, string anchorName)
+    {
+        return backupDir.GetDirectories().FirstOrDefault(dir => dir.Name == anchorName);
+    }
+
     public static string? FindMainBackupFile()
     {
         // find a folder entitled `.ghbackups`
@@ -92,7 +97,10 @@ public static class Volumes
         return null;
     }
 
-    public static double GetSizeInGB(DriveInfo volume) => volume.TotalSize / 1024 / 1024 / 1024;
+    public static long GetSizeInMB(long bytes) => bytes / 1024 / 1024;
+
+    public static long GetSizeInGB(long bytes) => bytes / 1024 / 1024 / 1024;
+    public static long GetSizeInGB(DriveInfo volume) => volume.TotalSize / 1024 / 1024 / 1024;
 
     public static HashSet<Repository> PopulateBackupDirectories(HashSet<Repository> repos, DirectoryInfo backupDir)
     {

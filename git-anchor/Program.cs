@@ -1,28 +1,29 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using GitAnchor.Actions;
+using GitAnchor.Lib;
 
 string[] inputArgs = Environment.GetCommandLineArgs();
-
-SortedDictionary<string, CallableAction> options = new()
-{
-    { "create", Create.Run },
-    { "pull", Pull.Run },
-    { "help", Help.Run }
-};
 
 try
 {
     foreach (string a in inputArgs)
     {
-        if (a == "") continue;
-
-        var result = options.TryGetValue(a, out CallableAction? action);
-
-        if (!result) continue;
-        if (action != null) return (int)await action();
+        string[] options = ["create", "pull", "list", "help"];
+        if (options.Contains(a))
+        {
+            return a switch
+            {
+                "create" => (int)await Create.RunAsync(),
+                "pull" => (int)await Pull.RunAsync(),
+                "list" => (int)List.Run(),
+                "help" => (int)Help.Run(),
+                _ => (int)Help.Run(),
+            };
+        };
     }
 
-    return (int)await Help.Run();
+    return (int)Help.Run();
 }
 catch (Exception ex)
 {
