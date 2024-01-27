@@ -69,7 +69,7 @@ public class Create : BaseAction
 
         foreach (Repository newProject in newProjects)
         {
-            GitHub.CloneProjectOptions options = new()
+            GitHub.GithubRepoOptions options = new()
             {
                 BackupDir = anchorDir,
                 Repo = newProject,
@@ -90,12 +90,9 @@ public class Create : BaseAction
         Task.WaitAll([.. taskPool]);
 
         reporter.Stop();
-
-        if (verbose)
-        {
-            var report = reporter.ToString();
-            Console.WriteLine(report);
-        }
+        
+        var report = reporter.ToString();
+        Console.WriteLine(report);
 
         return ActivityStatusCode.Ok;
     }

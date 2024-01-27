@@ -9,6 +9,7 @@ public abstract class BaseAction {
 
     public virtual async Task<ActivityStatusCode> RunAsync()
     {
+        await Task.Delay(0);
         throw new NotImplementedException();
     }
 }

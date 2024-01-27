@@ -21,8 +21,6 @@ namespace GitAnchor.Actions
             string anchorName = args.FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"))?.Split("=")[1].Trim()
                 ?? throw new Exception("No anchor name provided");
 
-            anchorName = anchorName.Split("=")[1].Trim();
-
             // find (or create) the anchor in question
             var anchor = Volumes.GetAnchor(mainBackupDir, anchorName) ?? FileSystemTools.SetUpAnchor(mainBackupDir, anchorName);
             var projectDirectories = anchor?.GetDirectories();
@@ -50,7 +48,14 @@ namespace GitAnchor.Actions
 
                 if (verbose) Console.WriteLine($"Preparing pull task for {repo.Name}");
 
-                Task pullTask = new(() => GitHub.PullExistingRepo(repo, backupDir, verbose));
+                var options = new GitHub.GithubRepoOptions
+                {
+                    Repo = repo,
+                    BackupDir = backupDir,
+                    Verbose = verbose,
+                };
+
+                Task pullTask = new(() => GitHub.PullExistingRepo(options));
                 taskPool.Add(pullTask);
             }
 

@@ -3,6 +3,12 @@ using Octokit;
 namespace GitAnchor.Lib;
 
 public static class CommandLineTools {
+    public static string? ReadAnchorName()
+    {
+        return Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"))?
+        .Split("=")[1].Trim();
+    }
+
     public static int ReadAsInt()
     {
         string? input = Console.ReadLine();

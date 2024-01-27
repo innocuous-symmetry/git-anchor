@@ -1,5 +1,6 @@
 ﻿using Octokit;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace GitAnchor.Lib
 {
@@ -80,23 +81,27 @@ namespace GitAnchor.Lib
             return projectsToUpdate;
         }
 
-        public record CloneProjectOptions
+        public record GithubRepoOptions
         {
-            public User User { get; init; } = default!;
-            public Repository Repo { get; init; } = default!;
             public DirectoryInfo BackupDir { get; init; } = default!;
-            public string Token { get; init; } = default!;
+            public User? User { get; init; } = default!;
+            public Repository? Repo { get; init; } = default!;
+            public string? ProjectPath { get; init; }
+            public string? Token { get; init; }
             public string? AnchorPath { get; init; }
-            public bool Verbose { get; init; } = false;
+            public bool? Verbose { get; init; } = false;
         }
 
-        public static void CloneProject(CloneProjectOptions options)
+        public static void CloneProject(GithubRepoOptions options)
         {
+            if (options.User == null) throw new Exception("User not found");
+            if (options.Repo == null) throw new Exception("Repository not found");
+
             string cloneString = "";
             cloneString += $"clone https://{options.Token}@github.com/";
             cloneString += $"{options.User.Login}/{options.Repo.Name} .";
 
-            Console.WriteLine($"Cloning {options.Repo.Name}...");
+            if (options.Verbose ?? false) Console.WriteLine($"Cloning {options.Repo.Name}...");
 
             using (Process process = new())
             {
@@ -104,21 +109,22 @@ namespace GitAnchor.Lib
                 {
                     FileName = "git",
                     Arguments = cloneString,
-                    WorkingDirectory = $"{options.BackupDir}/{options.Repo.Name}",
+                    WorkingDirectory = Path.Join(options.BackupDir.FullName, options.Repo.Name),
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 };
 
                 process.Start();
-                if (options.Verbose) Console.WriteLine(process.StandardOutput.ReadToEnd());
+                if (options.Verbose ?? false) Console.WriteLine(process.StandardOutput.ReadToEnd());
                 process.WaitForExit();
                 Console.WriteLine($"Clone complete for {options.Repo.Name}");
             };
         }
 
-        public static void PullExistingRepo(Repository repo, DirectoryInfo backupDir, bool verbose = false)
+        public static void PullExistingRepo(GithubRepoOptions options)
         {
-            Console.WriteLine($"Pulling {repo.Name}...");
+            if (options.Repo == null) throw new Exception("Repository not found");
+            Console.WriteLine($"Pulling {options.Repo.Name}...");
 
             using (Process process = new())
             {
@@ -126,15 +132,34 @@ namespace GitAnchor.Lib
                 {
                     FileName = "git",
                     Arguments = "pull",
-                    WorkingDirectory = $"{backupDir}/{repo.Name}",
+                    WorkingDirectory = Path.Join(options.BackupDir.FullName, options.Repo.Name),
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 };
 
                 process.Start();
-                if (verbose) Console.WriteLine(process.StandardOutput.ReadToEnd());
+                if (options.Verbose ?? false) Console.WriteLine(process.StandardOutput.ReadToEnd());
                 process.WaitForExit();
-                Console.WriteLine($"Pull complete for {repo.Name}");
+                Console.WriteLine($"Pull complete for {options.Repo.Name}");
+            };
+        }
+
+        public static void QueryStatus(GithubRepoOptions options)
+        {
+            using (Process process = new())
+            {
+                process.StartInfo = new()
+                {
+                    FileName = "git",
+                    Arguments = "status",
+                    WorkingDirectory = Path.Join(options.BackupDir.FullName, options.Repo?.Name ?? options.ProjectPath ?? throw new Exception("Unable to determine working directory")),
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                process.Start();
+                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                process.WaitForExit();
             };
         }
     }

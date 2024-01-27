@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 namespace GitAnchor.Lib;
 
 public static class FileSystemTools {
@@ -77,7 +78,38 @@ public static class FileSystemTools {
 
     private static DirectoryInfo? CreateMainWindowsDirectory(DriveInfo volume, string? location = ".git-anchor")
     {
-        bool isSystemDrive = volume.Name == "C:\\";
+        OSPlatform platform;
+
+        if (OperatingSystem.IsWindows())
+        {
+            platform = OSPlatform.Windows;
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            platform = OSPlatform.OSX;
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            platform = OSPlatform.Linux;
+        }
+        else
+        {
+            throw new Exception("Unsupported operating system");
+        }
+
+        bool isSystemDrive;
+        bool isExternalDrive;
+
+        if (platform == OSPlatform.Windows)
+        {
+            isSystemDrive = volume.Name == "C:\\";
+            isExternalDrive = volume.DriveType == DriveType.Removable && !isSystemDrive;
+        }
+        else
+        {
+            isSystemDrive = volume.Name == "/";
+            isExternalDrive = volume.DriveType == DriveType.Removable && !isSystemDrive;
+        }
 
         try
         {
