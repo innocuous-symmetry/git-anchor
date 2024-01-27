@@ -18,8 +18,10 @@ namespace GitAnchor.Actions
             // act on provided arguments
             string? token = args.FirstOrDefault(arg => arg.StartsWith("--token"));
             bool verbose = args.Any(arg => arg.StartsWith("--verbose") || arg.StartsWith("-v"));
-            string? anchorName = args.FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"))
+            string anchorName = args.FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"))?.Split("=")[1].Trim()
                 ?? throw new Exception("No anchor name provided");
+
+            anchorName = anchorName.Split("=")[1].Trim();
 
             // find (or create) the anchor in question
             var anchor = Volumes.GetAnchor(mainBackupDir, anchorName) ?? FileSystemTools.SetUpAnchor(mainBackupDir, anchorName);
@@ -53,7 +55,7 @@ namespace GitAnchor.Actions
             }
 
             // start progress tracker
-            ProgressReporter reporter = new();
+            using var reporter = new ProgressReporter();
             reporter.Start();
 
             Parallel.ForEach(taskPool, task => task.Start());

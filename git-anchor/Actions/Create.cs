@@ -9,13 +9,18 @@ public class Create : BaseAction
     {
         string[] args = Environment.GetCommandLineArgs();
 
-        string? backupName = args.FirstOrDefault(arg => arg.StartsWith("--name") || arg.StartsWith("-n"));
         string? token = args.FirstOrDefault(arg => arg.StartsWith("--token"));
+
+        string? backupName = args.FirstOrDefault(
+            arg => arg.StartsWith("--name") || arg.StartsWith("-n"))?
+            .Split("=")[1].Trim();
+
         bool verbose = args.Any(arg => arg.StartsWith("--verbose")
             || arg.StartsWith("-v"));
 
         // find or configure the default backup directory
-        DirectoryInfo backupDir = FileSystemTools.SetUpMainBackupFile() ?? throw new Exception("Encountered a problem creating main backup directory");
+        DirectoryInfo backupDir = FileSystemTools.SetUpMainBackupFile()
+            ?? throw new Exception("Encountered a problem creating main backup directory");
 
         // create backup file
         DirectoryInfo? anchorDir = FileSystemTools.SetUpAnchor(backupDir, backupName);
@@ -46,6 +51,16 @@ public class Create : BaseAction
             Console.WriteLine($"Found {privateRepos.Count()} private repos and {publicRepos.Count()} public repos.");
         }
 
+        // get user confirmation to proceed
+        Console.WriteLine($"\n\nProceed to clone {repos.Count()} repositories? (y/n)");
+        string? response = Console.ReadLine();
+
+        if (response?.ToLower() != "y")
+        {
+            Console.WriteLine("Aborting...");
+            return ActivityStatusCode.Ok;
+        }
+
         // set up, update directories for hosting projects
         HashSet<Repository> newProjects = Volumes.PopulateBackupDirectories(uniqueRepos, anchorDir);
 
@@ -68,7 +83,7 @@ public class Create : BaseAction
         Console.WriteLine($"Preparing to clone {taskPool.Count} repositories. Starting...");
 
         // start a timer to track progress
-        ProgressReporter reporter = new();
+        using var reporter = new ProgressReporter();
         reporter.Start();
 
         Parallel.ForEach(taskPool, task => task.Start());
